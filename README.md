@@ -11,4 +11,4 @@ To achieve a tighter or looser spacing of the panels, the Figure's ``inner_margi
 Since realistically no one is going to use this library except me, Figure objects default to a set of rc_params that I personally prefer. To avoid this, you may pass ``rc_params={}`` to the constructor.
 
 # Why the name?
-There is much larger and more famous plotting library called "seaborn".
+There is much larger and more famous plotting library called [seaborn](https://github.com/mwaskom/seaborn).
