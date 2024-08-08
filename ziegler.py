@@ -4,7 +4,7 @@ from matplotlib.axes import Axes
 import numpy as np
 
 
-class srAxes:
+class Axes:
     """
     Presents an API that resembles the matplotlib "axis" API.
     However, nothing is actually drawn until "render" is called.
@@ -54,7 +54,7 @@ class srAxes:
         for f, args, kwargs in zip(self.f_queue, self.args_queue, self.kwargs_queue):
             f(ax, *args, **kwargs)
 
-class srFigure:
+class Figure:
 
     def __init__(self, width=4, aspect_ratio=1, axis_label_size=12, panel_label_size=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, rc_params=None):
         try:
@@ -68,7 +68,7 @@ class srFigure:
 
         self.column_widths = column_widths / np.sum(column_widths)
         self.row_heights = row_heights / np.sum(row_heights)
-        self.axes = np.array([[srAxes() for _ in column_widths] for _ in row_heights])
+        self.axes = np.array([[Axes() for _ in column_widths] for _ in row_heights])
         self.inner_margin_pt = inner_margin_pt
 
         if rc_params == None:
