@@ -1,5 +1,7 @@
 Ziegler is a layer of convenience functions on top of matplotlib to suit my particular plotting preferences.
 
+The API is not currently stable, as I am sure I have already made some stupid decisions.
+
 # Panel Layout
 Many layout commands in matplotlib, e.g. ``fig.tight_layout()``, change the size of the figure. The primary goal of ziegler's layout algorithm, invoked by calling zfig.render(), is to achieve a tight layout without changing the specified figure dimensions.
 
