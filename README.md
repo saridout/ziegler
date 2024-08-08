@@ -1,7 +1,7 @@
 Ziegler is a layer of convenience functions on top of matplotlib to suit my particular plotting preferences.
 
 # Panel Layout
-Many layout commands in matplotlib, e.g. ``fig.tight_layout()``, change the size of the figure. The primary goal of srplot's layout algorithm, invoked by calling zfig.render(), is to achieve a tight layout without changing the specified figure dimensions.
+Many layout commands in matplotlib, e.g. ``fig.tight_layout()``, change the size of the figure. The primary goal of ziegler's layout algorithm, invoked by calling zfig.render(), is to achieve a tight layout without changing the specified figure dimensions.
 
 To achieve a tighter or looser spacing of the panels, the Figure's ``inner_margin_pt`` variable, which specifies the margins between panels and the adjacent axis labels in points (1/72 of an inch) should be adjusted.
 
