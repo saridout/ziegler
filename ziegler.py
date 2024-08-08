@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from matplotlib.axes import Axes
+from matplotlib.axes import Axes as mAxes
 import numpy as np
 
+import inspect
 
 class Axes:
     """
@@ -15,40 +16,21 @@ class Axes:
         self.args_queue = []
         self.kwargs_queue = []
 
-    def set_xlim(self, *args, **kwargs):
-        self.f_queue.append(Axes.set_xlim)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
+    #import all matplotlib Axes member functions
+    all_f = inspect.getmembers(mAxes, predicate=inspect.isfunction)
 
-    def set_ylim(self, *args, **kwargs):
-        self.f_queue.append(Axes.set_ylim)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
+    def mapped_function(g):
+        def f(self, *args, **kwargs):
+            self.f_queue.append(g)
+            self.args_queue.append(args)
+            self.kwargs_queue.append(kwargs)
+        return f
 
-    def plot(self, *args, **kwargs):
-        self.f_queue.append(Axes.plot)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
+    for name, g in all_f:
+        f = mapped_function(g)
 
-    def set_xlabel(self, *args, **kwargs):
-        self.f_queue.append(Axes.set_xlabel)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
-
-    def set_ylabel(self, *args, **kwargs):
-        self.f_queue.append(Axes.set_ylabel)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
-
-    def set_xticklabels(self, *args, **kwargs):
-        self.f_queue.append(Axes.set_xticklabels)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
-
-    def set_yticklabels(self, *args, **kwargs):
-        self.f_queue.append(Axes.set_yticklabels)
-        self.args_queue.append(args)
-        self.kwargs_queue.append(kwargs)
+        if not name[0] == "_":
+            locals()[name] = f
 
     def render(self, ax):
         for f, args, kwargs in zip(self.f_queue, self.args_queue, self.kwargs_queue):
