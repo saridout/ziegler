@@ -11,23 +11,28 @@ class Axes:
     However, nothing is actually drawn until "render" is called.
     Internally, we just a queue of commands for a real axis object
     """
-    def __init__(self):
+
+    def __init__(self, axis_label_fontsize=12):
         self.f_queue = []
         self.args_queue = []
         self.kwargs_queue = []
+        self.axis_label_fontsize=axis_label_fontsize
 
     #import all matplotlib Axes member functions
     all_f = inspect.getmembers(mAxes, predicate=inspect.isfunction)
 
-    def mapped_function(g):
+    def mapped_function(g, **default_kwargs):
         def f(self, *args, **kwargs):
             self.f_queue.append(g)
             self.args_queue.append(args)
-            self.kwargs_queue.append(kwargs)
+            self.kwargs_queue.append(dict(kwargs, **{kw: self.__dict__[default_kwargs[kw]] for kw in default_kwargs}))
         return f
 
     for name, g in all_f:
-        f = mapped_function(g)
+        if name == "set_xlabel" or name == "set_ylabel":
+            f = mapped_function(g, fontsize="axis_label_fontsize")
+        else:
+            f = mapped_function(g)
 
         if not name[0] == "_":
             locals()[name] = f
@@ -38,19 +43,18 @@ class Axes:
 
 class Figure:
 
-    def __init__(self, width=4, aspect_ratio=1, axis_label_size=12, panel_label_size=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, rc_params=None):
+    def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, rc_params=None):
         try:
             self.figure_width = width #inches
         except:
             self.set_figure_width(journal=width)
         
-        self.panel_label_size = panel_label_size #pt
-        self.axis_label_size = axis_label_size #pt
+        self.panel_label_fontsize = panel_label_fontsize #pt
         self.aspect_ratio = aspect_ratio #h/w
 
         self.column_widths = column_widths / np.sum(column_widths)
         self.row_heights = row_heights / np.sum(row_heights)
-        self.axes = np.array([[Axes() for _ in column_widths] for _ in row_heights])
+        self.axes = np.array([[Axes(axis_label_fontsize=axis_label_fontsize) for _ in column_widths] for _ in row_heights])
         self.inner_margin_pt = inner_margin_pt
 
         if rc_params == None:
