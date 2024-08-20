@@ -151,8 +151,8 @@ class Figure:
 
                 x_delta = (right_edge - left_edge)
                 y_delta = (top_edge - bottom_edge)
-                x_delta += n*inner_margin
-                y_delta += m*inner_margin
+                x_delta += inner_margin
+                y_delta += inner_margin
                 if x_delta > 0:
                     h_margins[n] += x_delta
                 if y_delta > 0:
