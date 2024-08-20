@@ -25,7 +25,7 @@ class Axes:
         def f(self, *args, **kwargs):
             self.f_queue.append(g)
             self.args_queue.append(args)
-            self.kwargs_queue.append(dict(kwargs, **{kw: self.__dict__[default_kwargs[kw]] for kw in default_kwargs}))
+            self.kwargs_queue.append(dict({kw: self.__dict__[default_kwargs[kw]] for kw in default_kwargs}, **kwargs))
         return f
 
     for name, g in all_f:
