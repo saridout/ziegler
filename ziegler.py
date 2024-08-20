@@ -127,7 +127,9 @@ class Figure:
 
         w = self.figure_width
         h = self.aspect_ratio*self.figure_width
-        inner_margin = (self.inner_margin_pt/72)/w
+        inner_x_margin = (self.inner_margin_pt/72)/w
+        inner_y_margin = (self.inner_margin_pt/72)/h
+
 
         h_margins = [0, ]*(len(self.column_widths)+1)
         v_margins = [0, ]*(len(self.row_heights)+1)
@@ -151,8 +153,8 @@ class Figure:
 
                 x_delta = (right_edge - left_edge)
                 y_delta = (top_edge - bottom_edge)
-                x_delta += inner_margin
-                y_delta += inner_margin
+                x_delta += inner_x_margin
+                y_delta += inner_y_margin
                 if x_delta > 0:
                     h_margins[n] += x_delta
                 if y_delta > 0:
