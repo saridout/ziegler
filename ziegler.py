@@ -45,8 +45,8 @@ class Figure:
 
     def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, rc_params=None):
         try:
-            self.figure_width = width #inches
-        except:
+            self.figure_width = float(width) #inches
+        except: 
             self.set_figure_width(journal=width)
         
         self.panel_label_fontsize = panel_label_fontsize #pt
@@ -72,6 +72,8 @@ class Figure:
                 self.figure_width = 5.6
             if journal == "PR_full":
                 self.figure_width = 7.08
+            if journal == "AnnRev": #strictly speaking, Annual Review of Condensed Matter Physics. may be different for others, not sure
+                self.figure_width = 5.06
 
 
     def render(self):
