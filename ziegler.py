@@ -18,6 +18,10 @@ class Axes:
         self.kwargs_queue = []
         self.axis_label_fontsize=axis_label_fontsize
 
+        self.plt_f_queue = []
+        self.plt_args_queue = []
+        self.plt_kwargs_queue = []
+
     #import all matplotlib Axes member functions
     all_f = inspect.getmembers(mAxes, predicate=inspect.isfunction)
 
@@ -37,13 +41,29 @@ class Axes:
         if not name[0] == "_":
             locals()[name] = f
 
+    def colorbar(self, **kwargs):
+        self.plt_f_queue.append(plt.colorbar)
+        self.plt_args_queue.append([])
+        self.plt_kwargs_queue.append(dict(**kwargs, cax=self)) #this requires special handling in render
+
+
+
     def render(self, ax):
         for f, args, kwargs in zip(self.f_queue, self.args_queue, self.kwargs_queue):
             f(ax, *args, **kwargs)
+        for g, args, _kwargs in zip(self.plt_f_queue, self.plt_args_queue, self.plt_kwargs_queue):
+            kwargs = {}
+            for key in _kwargs:
+                if _kwargs[key] == self:
+                    kwargs[key] = ax
+                else:
+                    kwargs[key] = _kwargs[key]
+
+            g(*args, **kwargs)
 
 class Figure:
 
-    def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, rc_params=None):
+    def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, rc_params=None):
         try:
             self.figure_width = float(width) #inches
         except: 
@@ -56,6 +76,8 @@ class Figure:
         self.row_heights = row_heights / np.sum(row_heights)
         self.axes = np.array([[Axes(axis_label_fontsize=axis_label_fontsize) for _ in column_widths] for _ in row_heights])
         self.inner_margin_pt = inner_margin_pt
+        self.top_margin_pt = top_margin_pt
+        self.left_margin_pt = left_margin_pt
 
         if rc_params == None:
             self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in' }
@@ -85,9 +107,16 @@ class Figure:
         v_margins = [0, ]*(len(self.row_heights)+1)
         with mpl.rc_context(self.rc_params):
             fig, axes = self.render_fixed_margins(h_margins, v_margins)
-            h_margins, v_margins = self.correct_margins(fig, axes)
+            h_margins, v_margins = self.correct_margins(fig, axes, h_margins, v_margins)
             plt.clf() #if working interactively, hide the "test" plot
             fig, axes = self.render_fixed_margins(h_margins, v_margins)
+            #need to correct a second time to approximately fix a higher-order correction my formula doesn't account for
+            #this correction arises if the stuff sticking into the margins is the tick labels rather than the axis labels
+            #One day, I will try to figure out how to apply the exact correction instead
+            h_margins, v_margins = self.correct_margins(fig, axes, h_margins, v_margins) 
+            plt.clf()
+            fig, axes = self.render_fixed_margins(h_margins, v_margins)
+
         return fig, axes
 
 
@@ -120,27 +149,27 @@ class Figure:
                 bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
 
 
-
         return fig, axes
 
 
-    def correct_margins(self, fig, axes):
+    def correct_margins(self, fig, axes, h_margins, v_margins):
 
 
         w = self.figure_width
         h = self.aspect_ratio*self.figure_width
         inner_x_margin = (self.inner_margin_pt/72)/w
         inner_y_margin = (self.inner_margin_pt/72)/h
+        left_margin = (self.left_margin_pt/72)/w
+        top_margin = (self.top_margin_pt/72)/h
 
-
-        h_margins = [0, ]*(len(self.column_widths)+1)
-        v_margins = [0, ]*(len(self.row_heights)+1)
 
         real_column_widths = np.array(self.column_widths)*(1 -sum(h_margins))
         real_row_heights = np.array(self.row_heights)*(1 -sum(v_margins))
 
 
         Y = 1
+        max_right_edge = 0.0
+        min_bottom_edge = 1.0
         bottom_edge = 1.0
         for m, (row, srrow) in enumerate(zip(axes, self.axes)):
             right_edge = 0.0 
@@ -149,24 +178,34 @@ class Figure:
                 bbox_pix = np.array(ax.axes.get_tightbbox().bounds)
                 bbox_inches = bbox_pix / mpl.rcParams['figure.dpi']
                 bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
-                #panel_box_rel = [X,Y ,real_column_widths[n] , real_row_heights[m]]
                 left_edge = bbox_rel[0] + sum([h_margins[i] for i in range(n+1)])
                 top_edge= bbox_rel[1] +bbox_rel[3] - sum([v_margins[i] for i in range(m+1)])
 
                 x_delta = (right_edge - left_edge)
                 y_delta = (top_edge - bottom_edge)
-                x_delta += inner_x_margin
-                y_delta += inner_y_margin
+                if n > 0:
+                    x_delta += inner_x_margin
+                else:
+                    x_delta += left_margin
+                if m > 0:
+                    y_delta += inner_y_margin
+                else:
+                    y_delta += top_margin
+
                 if x_delta > 0:
                     h_margins[n] += x_delta
                 if y_delta > 0:
                     v_margins[m] += y_delta
                 right_edge = bbox_rel[0] + bbox_rel[2] + sum([h_margins[i] for i in range(n+1)])
-            if bbox_rel[0] + bbox_rel[2] > 1 + h_margins[-1]:
-                h_margins[-1] = bbox_rel[0] + bbox_rel[2] - 1
-            bottom_edge = bbox_rel[1] - sum([v_margins[i] for i in range(m+1)])
-        if bbox_rel[1]  + v_margins[-1] <  0 :
-            v_margins[-1] = -bbox_rel[1] 
+                max_right_edge = max(right_edge, max_right_edge)
+                min_bottom_edge = min(min_bottom_edge, bbox_rel[1] - sum([v_margins[i] for i in range(m+1)]))
+
+                if bbox_rel[0] + bbox_rel[2] > 1 + h_margins[-1]:
+                    h_margins[-1] = bbox_rel[0] + bbox_rel[2] - 1
+                if bbox_rel[1]  + v_margins[-1] <  0 :
+                    v_margins[-1] = -bbox_rel[1] 
+            bottom_edge = min_bottom_edge
+
         return h_margins, v_margins
 
 
