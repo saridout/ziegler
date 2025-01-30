@@ -12,11 +12,12 @@ class Axes:
     Internally, we just a queue of commands for a real axis object
     """
 
-    def __init__(self, axis_label_fontsize=12):
+    def __init__(self, axis_label_fontsize=12, panel_label_fontsize=12):
         self.f_queue = []
         self.args_queue = []
         self.kwargs_queue = []
         self.axis_label_fontsize=axis_label_fontsize
+        self.panel_label_fontsize=panel_label_fontsize
 
         self.plt_f_queue = []
         self.plt_args_queue = []
@@ -46,7 +47,26 @@ class Axes:
         self.plt_args_queue.append([])
         self.plt_kwargs_queue.append(dict(**kwargs, cax=self)) #this requires special handling in render
 
+    def label_panel(self, **kwargs):
+        def _label_panel(ax, text=None, hpos=None, vpos=None, gap_pt=None):
+            bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
+            w, h = bbox.width, bbox.height
+            rel_dx =  (gap_pt/72)/w
+            rel_dy =  (gap_pt/72)/h
 
+            if hpos == "left":
+                x = rel_dx*(ax.xlim[1] - ax.xlim[0]) + ax.xlim[0]
+            if hpos == "right":
+                x = rel_dx*(ax.xlim[0] - ax.xlim[1]) + ax.xlim[1]
+            if vpos == "bottom":
+                y = rel_dy*(ax.ylim[1] - ax.ylim[0]) + ax.ylim[0]
+            if vpos == "top":
+                x = rel_dy*(ax.ylim[0] - ax.ylim[1]) + ax.ylim[1]
+
+            ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
+        self.f_queue.append(_label_panel)
+        self.args_queue.append([])
+        self.kwargs_queue.append(**kwargs)
 
     def render(self, ax):
         for f, args, kwargs in zip(self.f_queue, self.args_queue, self.kwargs_queue):
@@ -63,7 +83,7 @@ class Axes:
 
 class Figure:
 
-    def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, rc_params=None):
+    def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, right_margin_pt=0, rc_params=None):
         try:
             self.figure_width = float(width) #inches
         except: 
