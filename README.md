@@ -3,7 +3,7 @@ Ziegler is a layer of convenience functions on top of matplotlib to suit my part
 The interface is not currently stable, as I am sure I have already made some stupid decisions.
 
 # Panel Layout
-Ziegler's layout algorithm, invoked by calling zfig.render(), tries to achieve a somewhat nicer tight layout than the one produced by matplotlibs ``tight_layout()`` command.
+Ziegler's layout algorithm, invoked by calling zfig.render(), tries to achieve a somewhat nicer tight layout than the one produced by matplotlib's ``tight_layout()`` command.
 
 To achieve a tighter or looser spacing of the panels, the Figure's ``inner_margin_pt`` variable, which specifies the margins between panels and the adjacent axis labels in points (1/72 of an inch) should be adjusted.
 
