@@ -111,7 +111,6 @@ class Figure:
             self.figure_width = float(width) #inches
         except: 
             self.set_figure_width(journal=width)
-        
         self.panel_label_fontsize = panel_label_fontsize #pt
         self.aspect_ratio = aspect_ratio #h/w
 
@@ -121,6 +120,7 @@ class Figure:
         self.inner_margin_pt = inner_margin_pt
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
+        self.right_margin_pt = right_margin_pt
 
         if rc_params == None:
             self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in'}
@@ -206,7 +206,6 @@ class Figure:
                 bbox_inches = bbox_pix / mpl.rcParams['figure.dpi']
                 bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
 
-
         return fig, axes
 
 
@@ -219,7 +218,7 @@ class Figure:
         inner_y_margin = (self.inner_margin_pt/72)/h
         left_margin = (self.left_margin_pt/72)/w
         top_margin = (self.top_margin_pt/72)/h
-
+        right_margin = (self.right_margin_pt/72)/w
 
         real_column_widths = np.array(self.column_widths)*(1 -sum(h_margins))
         real_row_heights = np.array(self.row_heights)*(1 -sum(v_margins))
@@ -258,8 +257,8 @@ class Figure:
                 max_right_edge = max(right_edge, max_right_edge)
                 min_bottom_edge = min(min_bottom_edge, bbox_rel[1] - sum([v_margins[i] for i in range(m+1)]))
 
-                if bbox_rel[0] + bbox_rel[2] > 1 + h_margins[-1]:
-                    h_margins[-1] = bbox_rel[0] + bbox_rel[2] - 1
+                if bbox_rel[0] + bbox_rel[2] > 1 - right_margin + h_margins[-1]:
+                    h_margins[-1] = bbox_rel[0] + bbox_rel[2] + right_margin - 1
                 if bbox_rel[1]  + v_margins[-1] <  0 :
                     v_margins[-1] = -bbox_rel[1] 
             bottom_edge = min_bottom_edge
