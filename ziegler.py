@@ -72,13 +72,13 @@ class Axes:
 
 
             if hpos == "left":
-                x = x_inv(rel_dx*(x_tf(ax.xlim[1]) - x_tf(ax.xlim[0])) + x_tf(ax.xlim[0]))
+                x = x_inv(rel_dx*(x_tf(ax.get_xlim()[1]) - x_tf(ax.get_xlim()[0])) + x_tf(ax.get_xlim()[0]))
             if hpos == "right":
-                x = x_inv(rel_dx*(x_tf(ax.xlim[0]) - x_tf(ax.xlim[1])) + x_tf(ax.xlim[1]))
+                x = x_inv(rel_dx*(x_tf(ax.get_xlim()[0]) - x_tf(ax.get_xlim()[1])) + x_tf(ax.get_xlim()[1]))
             if vpos == "bottom":
-                y = y_inv(rel_dy*(y_tf(ax.ylim[1]) - y_tf(ax.ylim[0])) + y_tf(ax.ylim[0]))
+                y = y_inv(rel_dy*(y_tf(ax.get_ylim()[1]) - y_tf(ax.get_ylim()[0])) + y_tf(ax.get_ylim()[0]))
             if vpos == "top":
-                x = y_inv(rel_dy*(y_tf(ax.ylim[0]) - y_tf(ax.ylim[1])) + y_tf(ax.ylim[1]))
+                x = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
 
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
