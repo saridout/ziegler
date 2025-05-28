@@ -5,6 +5,14 @@ import numpy as np
 
 import inspect
 
+widths = { "PR": 3+3/8,
+          "eLife": 5.6,
+          "PR_full": 7.08,
+          "AnnRev": 5.06,
+          "poster": 10,
+          "powerpoint": 11.5
+          }
+
 class Axes:
     """
     Presents an API that resembles the matplotlib "axis" API.
@@ -66,7 +74,7 @@ class Axes:
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
         self.args_queue.append([])
-        self.kwargs_queue.append(**kwargs)
+        self.kwargs_queue.append(kwargs)
 
     def render(self, ax):
         for f, args, kwargs in zip(self.f_queue, self.args_queue, self.kwargs_queue):
@@ -83,7 +91,13 @@ class Axes:
 
 class Figure:
 
-    def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, right_margin_pt=0, rc_params=None):
+    def __init__(self, width=4, aspect_ratio=1,
+                 axis_label_fontsize=12, panel_label_fontsize=12,
+                 column_widths=[1.0,], row_heights=[1.0,],
+                 inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, right_margin_pt=0,
+                 ax_line_scale=1, line_scale=1,
+                 rc_params=None):
+        print("INIT")
         try:
             self.figure_width = float(width) #inches
         except: 
@@ -100,23 +114,38 @@ class Figure:
         self.left_margin_pt = left_margin_pt
 
         if rc_params == None:
-            self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in' }
+            self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in'}
         else:
             self.rc_params = {}
+        
+        self.rc_params['axes.linewidth'] =  0.8*ax_line_scale
+        self.rc_params['xtick.major.width'] =  0.8*ax_line_scale
+        self.rc_params['ytick.major.width'] =  0.8*ax_line_scale
+        self.rc_params['xtick.minor.width'] =  0.6*ax_line_scale
+        self.rc_params['ytick.minor.width'] =  0.6*ax_line_scale
+
+        self.rc_params['lines.linewidth'] =  1.5*line_scale
+
+
+
+        
+        
 
     def set_figure_width(self, width_inches=None, journal=None):
         if not width_inches == None:
             self.figure_width = width_inches
         else:
-            if journal == "PR":
-                self.figure_width = 3 + 3/8
-            if journal == "eLife":
-                self.figure_width = 5.6
-            if journal == "PR_full":
-                self.figure_width = 7.08
-            if journal == "AnnRev": #strictly speaking, Annual Review of Condensed Matter Physics. may be different for others, not sure
-                self.figure_width = 5.06
-
+            self.figure_width = widths[journal]
+            
+    def hide_internal_labels(self, x=True, y=True):
+        if y:
+            for column in self.axes[1:]:
+                for ax in column:
+                    ax.set_yticklabels([])
+        if x:
+            for column in self.axes:
+                for ax in column[:-1]:
+                    ax.set_xticklabels([])
 
     def render(self):
         """
