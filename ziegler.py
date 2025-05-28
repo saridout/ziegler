@@ -54,19 +54,21 @@ class Axes:
             rel_dx =  (gap_pt/72)/w
             rel_dy =  (gap_pt/72)/h
 
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
             if hpos == "left":
-                x = rel_dx*(ax.xlim[1] - ax.xlim[0]) + ax.xlim[0]
+                x = rel_dx*(xlim[1] - xlim[0]) + xlim[0]
             if hpos == "right":
-                x = rel_dx*(ax.xlim[0] - ax.xlim[1]) + ax.xlim[1]
+                x = rel_dx*(xlim[0] - xlim[1]) + xlim[1]
             if vpos == "bottom":
-                y = rel_dy*(ax.ylim[1] - ax.ylim[0]) + ax.ylim[0]
+                y = rel_dy*(ylim[1] - ylim[0]) + ylim[0]
             if vpos == "top":
-                x = rel_dy*(ax.ylim[0] - ax.ylim[1]) + ax.ylim[1]
+                y = rel_dy*(ylim[0] - ylim[1]) + ylim[1]
 
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
         self.args_queue.append([])
-        self.kwargs_queue.append(**kwargs)
+        self.kwargs_queue.append(kwargs)
 
     def render(self, ax):
         for f, args, kwargs in zip(self.f_queue, self.args_queue, self.kwargs_queue):
@@ -84,11 +86,10 @@ class Axes:
 class Figure:
 
     def __init__(self, width=4, aspect_ratio=1, axis_label_fontsize=12, panel_label_fontsize=12, column_widths=[1.0,], row_heights=[1.0,], inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, right_margin_pt=0, rc_params=None):
-        try:
+        try: 
             self.figure_width = float(width) #inches
         except: 
             self.set_figure_width(journal=width)
-        
         self.panel_label_fontsize = panel_label_fontsize #pt
         self.aspect_ratio = aspect_ratio #h/w
 
@@ -98,6 +99,7 @@ class Figure:
         self.inner_margin_pt = inner_margin_pt
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
+        self.right_margin_pt = right_margin_pt
 
         if rc_params == None:
             self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in' }
@@ -168,7 +170,6 @@ class Figure:
                 bbox_inches = bbox_pix / mpl.rcParams['figure.dpi']
                 bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
 
-
         return fig, axes
 
 
@@ -181,7 +182,7 @@ class Figure:
         inner_y_margin = (self.inner_margin_pt/72)/h
         left_margin = (self.left_margin_pt/72)/w
         top_margin = (self.top_margin_pt/72)/h
-
+        right_margin = (self.right_margin_pt/72)/w
 
         real_column_widths = np.array(self.column_widths)*(1 -sum(h_margins))
         real_row_heights = np.array(self.row_heights)*(1 -sum(v_margins))
@@ -220,8 +221,8 @@ class Figure:
                 max_right_edge = max(right_edge, max_right_edge)
                 min_bottom_edge = min(min_bottom_edge, bbox_rel[1] - sum([v_margins[i] for i in range(m+1)]))
 
-                if bbox_rel[0] + bbox_rel[2] > 1 + h_margins[-1]:
-                    h_margins[-1] = bbox_rel[0] + bbox_rel[2] - 1
+                if bbox_rel[0] + bbox_rel[2] > 1 - right_margin + h_margins[-1]:
+                    h_margins[-1] = bbox_rel[0] + bbox_rel[2] + right_margin - 1
                 if bbox_rel[1]  + v_margins[-1] <  0 :
                     v_margins[-1] = -bbox_rel[1] 
             bottom_edge = min_bottom_edge
