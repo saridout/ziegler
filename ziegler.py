@@ -78,7 +78,7 @@ class Axes:
             if vpos == "bottom":
                 y = y_inv(rel_dy*(y_tf(ax.get_ylim()[1]) - y_tf(ax.get_ylim()[0])) + y_tf(ax.get_ylim()[0]))
             if vpos == "top":
-                x = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
+                y = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
 
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
