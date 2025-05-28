@@ -62,14 +62,23 @@ class Axes:
             rel_dx =  (gap_pt/72)/w
             rel_dy =  (gap_pt/72)/h
 
+            assert ax.get_xscale() == 'log' or ax.get_xscale() == 'linear'
+            assert ax.get_yscale() == 'log' or ax.get_yscale() == 'linear'
+
+            y_tf = np.log if ax.get_yscale() == 'log' else lambda x:x
+            x_tf = np.log if ax.get_xscale() == 'log' else lambda x:x
+            y_inv = np.exp if ax.get_yscale() == 'log' else lambda x:x
+            x_inv = np.exp if ax.get_xscale() == 'log' else lambda x:x
+
+
             if hpos == "left":
-                x = rel_dx*(ax.xlim[1] - ax.xlim[0]) + ax.xlim[0]
+                x = x_inv(rel_dx*(x_tf(ax.xlim[1]) - x_tf(ax.xlim[0])) + x_tf(ax.xlim[0]))
             if hpos == "right":
-                x = rel_dx*(ax.xlim[0] - ax.xlim[1]) + ax.xlim[1]
+                x = x_inv(rel_dx*(x_tf(ax.xlim[0]) - x_tf(ax.xlim[1])) + x_tf(ax.xlim[1]))
             if vpos == "bottom":
-                y = rel_dy*(ax.ylim[1] - ax.ylim[0]) + ax.ylim[0]
+                y = y_inv(rel_dy*(y_tf(ax.ylim[1]) - y_tf(ax.ylim[0])) + y_tf(ax.ylim[0]))
             if vpos == "top":
-                x = rel_dy*(ax.ylim[0] - ax.ylim[1]) + ax.ylim[1]
+                x = y_inv(rel_dy*(y_tf(ax.ylim[0]) - y_tf(ax.ylim[1])) + y_tf(ax.ylim[1]))
 
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
