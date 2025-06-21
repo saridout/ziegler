@@ -104,9 +104,8 @@ class Figure:
                  axis_label_fontsize=12, panel_label_fontsize=12,
                  column_widths=[1.0,], row_heights=[1.0,],
                  inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, right_margin_pt=0,
-                 ax_line_scale=1, line_scale=1,
+                 ax_line_scale=1, line_scale=1, bare_top=True, bare_right=True,
                  rc_params=None):
-        print("INIT")
         try:
             self.figure_width = float(width) #inches
         except: 
@@ -121,6 +120,9 @@ class Figure:
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
         self.right_margin_pt = right_margin_pt
+
+        self.bare_top = bare_top
+        self.bare_right = bare_right
 
         if rc_params == None:
             self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in'}
@@ -218,8 +220,14 @@ class Figure:
         inner_y_margin = (self.inner_margin_pt/72)/h
         left_margin = (self.left_margin_pt/72)/w
         top_margin = (self.top_margin_pt/72)/h
-        right_margin = (self.right_margin_pt/72)/w
+        right_margin = (self.right_margin_pt/72 )/w
 
+        if self.bare_right:
+            right_margin += self.rc_params['axes.linewidth'] / (2*72*w)
+        if self.bare_top:
+            top_margin += self.rc_params['axes.linewidth'] / (2*72*w)
+
+        
         real_column_widths = np.array(self.column_widths)*(1 -sum(h_margins))
         real_row_heights = np.array(self.row_heights)*(1 -sum(v_margins))
 
