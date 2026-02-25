@@ -13,6 +13,11 @@ widths = { "PR": 3+3/8,
           "powerpoint": 11.5
           }
 
+colors = {"cadmium_red": "#D22B2B",
+          "cobalt_blue": "#0047AB",
+          "sean_green": "#1E8449"
+          }
+
 class Axes:
     """
     Presents an API that resembles the matplotlib "axis" API.
@@ -70,7 +75,6 @@ class Axes:
             y_inv = np.exp if ax.get_yscale() == 'log' else lambda x:x
             x_inv = np.exp if ax.get_xscale() == 'log' else lambda x:x
 
-
             if hpos == "left":
                 x = x_inv(rel_dx*(x_tf(ax.get_xlim()[1]) - x_tf(ax.get_xlim()[0])) + x_tf(ax.get_xlim()[0]))
             if hpos == "right":
@@ -79,6 +83,13 @@ class Axes:
                 y = y_inv(rel_dy*(y_tf(ax.get_ylim()[1]) - y_tf(ax.get_ylim()[0])) + y_tf(ax.get_ylim()[0]))
             if vpos == "top":
                 y = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
+            if hpos == "out":
+                rel_dx = -rel_dx
+                x = x_inv(rel_dx*(x_tf(ax.get_xlim()[1]) - x_tf(ax.get_xlim()[0])) + x_tf(ax.get_xlim()[0]))
+                rel_dy = 0
+                y = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
+                hpos="right"
+                vpos="center"
 
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
@@ -115,11 +126,12 @@ class Figure:
 
         self.column_widths = column_widths / np.sum(column_widths)
         self.row_heights = row_heights / np.sum(row_heights)
-        self.axes = np.array([[Axes(axis_label_fontsize=axis_label_fontsize) for _ in column_widths] for _ in row_heights])
+        self.axes = np.array([[Axes(axis_label_fontsize=axis_label_fontsize, panel_label_fontsize=panel_label_fontsize) for _ in column_widths] for _ in row_heights])
         self.inner_margin_pt = inner_margin_pt
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
         self.right_margin_pt = right_margin_pt
+        self.axis_label_fontsize = axis_label_fontsize
 
         self.bare_top = bare_top
         self.bare_right = bare_right
@@ -127,7 +139,7 @@ class Figure:
         if rc_params == None:
             self.rc_params = {"xtick.direction": 'in', "ytick.direction": 'in'}
         else:
-            self.rc_params = {}
+            self.rc_params = rc_params
         
         self.rc_params['axes.linewidth'] =  0.8*ax_line_scale
         self.rc_params['xtick.major.width'] =  0.8*ax_line_scale
@@ -136,6 +148,14 @@ class Figure:
         self.rc_params['ytick.minor.width'] =  0.6*ax_line_scale
 
         self.rc_params['lines.linewidth'] =  1.5*line_scale
+
+        #in general, you want to avoid calling functions of the matplotlib figure class
+        #however, we do implement a couple
+        self.f_queue = []
+        self.args_queue = []
+        self.kwargs_queue = []
+        self.artist_queue = []
+        self.artists = {}
 
 
 
@@ -149,14 +169,29 @@ class Figure:
             self.figure_width = widths[journal]
             
     def hide_internal_labels(self, x=True, y=True):
-        if y:
-            for column in self.axes[1:]:
-                for ax in column:
-                    ax.set_yticklabels([])
         if x:
-            for column in self.axes:
-                for ax in column[:-1]:
+            for row in self.axes[:-1]:
+                for ax in row:
                     ax.set_xticklabels([])
+        if y:
+            for row in self.axes:
+                for ax in row[1:]:
+                    ax.set_yticklabels([])
+
+
+    def mapped_function(g, artist_key, **default_kwargs):
+        def f(self, *args, **kwargs):
+            self.f_queue.append(g)
+            self.args_queue.append(args)
+            self.kwargs_queue.append(dict({kw: self.__dict__[default_kwargs[kw]] for kw in default_kwargs}, **kwargs))
+            self.artist_queue.append(artist_key)
+
+        return f
+    
+    
+    supxlabel = mapped_function(mpl.figure.Figure.supxlabel, "supxlabel",fontsize="axis_label_fontsize")
+    supylabel = mapped_function(mpl.figure.Figure.supylabel, "supylabel",fontsize="axis_label_fontsize")
+        
 
     def render(self):
         """
@@ -192,6 +227,7 @@ class Figure:
         
         axes = []
         Y = 1
+         
         for m, row in enumerate(self.axes):
             axes.append([])
             Y = Y - v_margins[m]
@@ -208,7 +244,35 @@ class Figure:
                 bbox_inches = bbox_pix / mpl.rcParams['figure.dpi']
                 bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
 
+        self.artists = {}
+        for f, artist_key, args, kwargs in zip(self.f_queue, self.artist_queue, self.args_queue, self.kwargs_queue):
+            if artist_key is None:
+                f(fig, *args, **kwargs)
+            else:
+                print(args, kwargs)
+                self.artists[artist_key] = f(fig, *args, **kwargs)
+
         return fig, axes
+
+    def bbox_pix(self, m, n, ax):
+
+        bounds = np.array(ax.get_tightbbox().bounds) #x0, y0, width, height
+
+        if "supxlabel" in self.artists and m == 1:
+            #want to extend bbox downward
+            xlabel_bounds = self.artists["supxlabel"].get_window_extent().bounds
+            new_height = xlabel_bounds[1] + xlabel_bounds[3]  + bounds[3]
+            bounds[1] = bounds[1] - (xlabel_bounds[1] + xlabel_bounds[3])
+            bounds[3] = new_height
+
+        if "supylabel" in self.artists and n == 0:
+            #want to extend bbox right
+            ylabel_bounds = self.artists["supylabel"].get_window_extent().bounds
+            new_width = ylabel_bounds[0] + ylabel_bounds[2] + bounds[2]
+            bounds[0] = bounds[0] - (ylabel_bounds[0] + ylabel_bounds[2])
+            bounds[2] = new_width
+
+        return bounds
 
 
     def correct_margins(self, fig, axes, h_margins, v_margins):
@@ -240,7 +304,7 @@ class Figure:
             right_edge = 0.0 
             for n, (ax, srax) in enumerate(zip(row, srrow)):
 
-                bbox_pix = np.array(ax.axes.get_tightbbox().bounds)
+                bbox_pix = self.bbox_pix(m,n, ax)
                 bbox_inches = bbox_pix / mpl.rcParams['figure.dpi']
                 bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
                 left_edge = bbox_rel[0] + sum([h_margins[i] for i in range(n+1)])
