@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.transforms as mtransforms
 from matplotlib.axes import Axes as mAxes
 from matplotlib.artist import Artist
 import numpy as np
@@ -95,12 +96,17 @@ class Axes:
             if vpos == "top":
                 y = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
             if hpos == "out":
-                rel_dx = -rel_dx
-                x = x_inv(rel_dx*(x_tf(ax.get_xlim()[1]) - x_tf(ax.get_xlim()[0])) + x_tf(ax.get_xlim()[0]))
-                rel_dy = 0
-                y = y_inv(rel_dy*(y_tf(ax.get_ylim()[0]) - y_tf(ax.get_ylim()[1])) + y_tf(ax.get_ylim()[1]))
-                hpos="right"
-                vpos="center"
+                # Use an offset transform so the position is a fixed number of
+                # points from the left spine, independent of axis width. This
+                # avoids a convergence problem where data-coordinate placement
+                # shifts as the margin correction narrows the axis.
+                t = mtransforms.offset_copy(
+                    ax.transAxes, fig=ax.figure, x=-gap_pt, y=0, units='points'
+                )
+                ax.text(0, 1, text, transform=t,
+                        verticalalignment='top', horizontalalignment='right',
+                        fontsize=self.panel_label_fontsize)
+                return
 
             ax.text(x, y, text, verticalalignment=vpos, horizontalalignment=hpos, fontsize=self.panel_label_fontsize)
         self.f_queue.append(_label_panel)
