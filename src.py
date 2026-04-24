@@ -7,6 +7,8 @@ import numpy as np
 import inspect
 import copy
 
+_UNSET = object()  # sentinel for detecting whether a parameter was explicitly passed
+
 widths = {"PR": 3+3/8,
           "eLife": 5.6,
           "PR_full": 7.08,
@@ -132,7 +134,8 @@ class Figure:
     def __init__(self, width=4, aspect_ratio=1,
                  axis_label_fontsize=12, panel_label_fontsize=12,
                  column_widths=[1.0,], row_heights=[1.0,],
-                 inner_margin_pt=6, top_margin_pt=0, left_margin_pt=0, right_margin_pt=0,
+                 inner_margin_pt=_UNSET, inner_hmargin_pt=None, inner_vmargin_pt=None,
+                 top_margin_pt=0, left_margin_pt=0, right_margin_pt=0,
                  ax_line_scale=1, line_scale=1, bare_top=True, bare_right=True,
                  tick_label_fontsize=None,
                  rc_params=None):
@@ -192,7 +195,16 @@ class Figure:
                 for _ in row_heights
             ])
 
-        self.inner_margin_pt = inner_margin_pt
+        inner_margin_pt_given = inner_margin_pt is not _UNSET
+        if inner_margin_pt is _UNSET:
+            inner_margin_pt = 6
+        if inner_margin_pt_given and (inner_hmargin_pt is not None or inner_vmargin_pt is not None):
+            raise ValueError(
+                "Cannot specify inner_hmargin_pt or inner_vmargin_pt alongside "
+                "a non-default inner_margin_pt; use one or the other"
+            )
+        self.inner_hmargin_pt = inner_hmargin_pt if inner_hmargin_pt is not None else inner_margin_pt
+        self.inner_vmargin_pt = inner_vmargin_pt if inner_vmargin_pt is not None else inner_margin_pt
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
         self.right_margin_pt = right_margin_pt
@@ -421,8 +433,8 @@ class Figure:
         w = self.figure_width
         h = self.aspect_ratio * self.figure_width
         dpi = fig.dpi
-        inner_x_margin = (self.inner_margin_pt/72) / w
-        inner_y_margin = (self.inner_margin_pt/72) / h
+        inner_x_margin = (self.inner_hmargin_pt/72) / w
+        inner_y_margin = (self.inner_vmargin_pt/72) / h
         left_margin = (self.left_margin_pt/72) / w
         top_margin = (self.top_margin_pt/72) / h
         right_margin = (self.right_margin_pt/72) / w
