@@ -124,8 +124,8 @@ class Axes:
 
             _ = g(*args, **kwargs)
 
-            if self.tick_label_fontsize is not None:
-                ax.tick_params(axis='both', which='major', labelsize=self.tick_label_fontsize)
+        if self.tick_label_fontsize is not None:
+            ax.tick_params(axis='both', which='major', labelsize=self.tick_label_fontsize)
 
 class Figure:
 
