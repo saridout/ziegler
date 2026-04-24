@@ -450,6 +450,27 @@ class Figure:
                     min_bottom = min(min_bottom, br[1] - sum(col_v_margins[:m+1]))
                     bottom_edge = min_bottom
 
+            # ---- Equalize top/bottom margins so all columns share the same outer edges ----
+            shared_top = max(vm[0] for vm in v_margins)
+            shared_bot = max(vm[-1] for vm in v_margins)
+            for vm in v_margins:
+                vm[0] = shared_top
+                vm[-1] = shared_bot
+
+            # ---- For columns with the same row count, equalize internal margins so
+            #      row boundaries land at the same Y positions across those columns ----
+            from collections import defaultdict
+            col_groups = defaultdict(list)
+            for n, vm in enumerate(v_margins):
+                col_groups[len(vm) - 1].append(n)  # key = number of rows
+            for col_indices in col_groups.values():
+                if len(col_indices) > 1:
+                    n_internal = len(v_margins[col_indices[0]]) - 2  # internal boundaries
+                    for k in range(1, n_internal + 1):
+                        shared = max(v_margins[n][k] for n in col_indices)
+                        for n in col_indices:
+                            v_margins[n][k] = shared
+
             # ---- Horizontal margins: shared across all columns ----
             max_right_edge = 0.0
             for n, col_axes in enumerate(axes):
@@ -486,6 +507,27 @@ class Figure:
                     if br[0] + br[2] > 1 - right_margin + row_h_margins[-1]:
                         row_h_margins[-1] = br[0] + br[2] + right_margin - 1
                     right_edge = max(right_edge, br[0] + br[2] + sum(row_h_margins[:n+1]))
+
+            # ---- Equalize left/right margins so all rows share the same outer edges ----
+            shared_left = max(hm[0] for hm in h_margins)
+            shared_right = max(hm[-1] for hm in h_margins)
+            for hm in h_margins:
+                hm[0] = shared_left
+                hm[-1] = shared_right
+
+            # ---- For rows with the same column count, equalize internal margins so
+            #      column boundaries land at the same X positions across those rows ----
+            from collections import defaultdict
+            row_groups = defaultdict(list)
+            for m, hm in enumerate(h_margins):
+                row_groups[len(hm) - 1].append(m)  # key = number of columns
+            for row_indices in row_groups.values():
+                if len(row_indices) > 1:
+                    n_internal = len(h_margins[row_indices[0]]) - 2
+                    for k in range(1, n_internal + 1):
+                        shared = max(h_margins[m][k] for m in row_indices)
+                        for m in row_indices:
+                            h_margins[m][k] = shared
 
             # ---- Vertical margins: shared across all rows ----
             bottom_edge = 1.0
