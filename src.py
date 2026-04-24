@@ -7,10 +7,13 @@ import numpy as np
 import inspect
 import copy
 
-widths = { "PR": 3+3/8,
+widths = {"PR": 3+3/8,
           "eLife": 5.6,
           "PR_full": 7.08,
           "AnnRev": 5.06,
+          "PNAS": 3.42,
+          "PNAS_mid": 4.5,
+          "PNAS_full": 7.0,
           "poster": 10,
           "powerpoint": 11.5
           }
@@ -140,14 +143,55 @@ class Figure:
         self.panel_label_fontsize = panel_label_fontsize #pt
         self.aspect_ratio = aspect_ratio #h/w
 
-        self.column_widths = column_widths / np.sum(column_widths)
-        self.row_heights = row_heights / np.sum(row_heights)
-        self.axes = np.array([
-            [Axes(axis_label_fontsize=axis_label_fontsize,
-                  panel_label_fontsize=panel_label_fontsize,
-                  tick_label_fontsize=tick_label_fontsize) for _ in column_widths]
-            for _ in row_heights
-        ])
+        # Detect whether row_heights or column_widths is a list-of-lists, indicating
+        # an irregular grid.
+        #
+        # col_major: row_heights is a list-of-lists (one array per column).
+        #   axes[col][row]; each column has its own independent set of rows.
+        #
+        # row_major: column_widths is a list-of-lists (one array per row).
+        #   axes[row][col]; each row has its own independent set of columns.
+        #
+        # regular: both are flat arrays. axes[row][col] as before.
+        rows_irregular = np.ndim(row_heights[0]) > 0
+        cols_irregular = np.ndim(column_widths[0]) > 0
+        if rows_irregular and cols_irregular:
+            raise ValueError(
+                "row_heights and column_widths cannot both be irregular (list-of-lists)"
+            )
+
+        def _make_ax():
+            return Axes(axis_label_fontsize=axis_label_fontsize,
+                        panel_label_fontsize=panel_label_fontsize,
+                        tick_label_fontsize=tick_label_fontsize)
+
+        if rows_irregular:
+            self._layout = 'col_major'
+            self.column_widths = np.array(column_widths, dtype=float) / np.sum(column_widths)
+            if len(row_heights) != len(column_widths):
+                raise ValueError(
+                    "When row_heights is a list-of-lists, it must have one entry per column"
+                )
+            self.row_heights = [np.array(rh, dtype=float) / np.sum(rh) for rh in row_heights]
+            self.axes = [[_make_ax() for _ in rh] for rh in row_heights]
+        elif cols_irregular:
+            self._layout = 'row_major'
+            self.row_heights = np.array(row_heights, dtype=float) / np.sum(row_heights)
+            if len(column_widths) != len(row_heights):
+                raise ValueError(
+                    "When column_widths is a list-of-lists, it must have one entry per row"
+                )
+            self.column_widths = [np.array(cw, dtype=float) / np.sum(cw) for cw in column_widths]
+            self.axes = [[_make_ax() for _ in cw] for cw in column_widths]
+        else:
+            self._layout = 'regular'
+            self.column_widths = np.array(column_widths, dtype=float) / np.sum(column_widths)
+            self.row_heights = np.array(row_heights, dtype=float) / np.sum(row_heights)
+            self.axes = np.array([
+                [_make_ax() for _ in column_widths]
+                for _ in row_heights
+            ])
+
         self.inner_margin_pt = inner_margin_pt
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
@@ -179,10 +223,20 @@ class Figure:
         self.artist_queue = []
         self.artists = {}
 
-
-
-
-
+    def _init_margins(self):
+        """Return zero-initialized (h_margins, v_margins) appropriate for the current layout."""
+        if self._layout == 'col_major':
+            n_cols = len(self.column_widths)
+            h_margins = [0.0] * (n_cols + 1)
+            v_margins = [[0.0] * (len(rh) + 1) for rh in self.row_heights]
+        elif self._layout == 'row_major':
+            n_rows = len(self.row_heights)
+            h_margins = [[0.0] * (len(cw) + 1) for cw in self.column_widths]
+            v_margins = [0.0] * (n_rows + 1)
+        else:
+            h_margins = [0.0] * (len(self.column_widths) + 1)
+            v_margins = [0.0] * (len(self.row_heights) + 1)
+        return h_margins, v_margins
 
     def set_figure_width(self, width_inches=None, journal=None):
         if width_inches is not None:
@@ -191,15 +245,36 @@ class Figure:
             self.figure_width = widths[journal]
 
     def hide_internal_labels(self, x=True, y=True):
-        if x:
-            for row in self.axes[:-1]:
-                for ax in row:
-                    ax.set_xticklabels([])
-        if y:
-            for row in self.axes:
-                for ax in row[1:]:
-                    ax.set_yticklabels([])
-
+        if self._layout == 'col_major':
+            # axes[col][row]
+            if x:
+                for col in self.axes:
+                    for ax in col[:-1]:  # all but last row in each column
+                        ax.set_xticklabels([])
+            if y:
+                for col in self.axes[1:]:  # all but first column
+                    for ax in col:
+                        ax.set_yticklabels([])
+        elif self._layout == 'row_major':
+            # axes[row][col]
+            if x:
+                for row in self.axes[:-1]:  # all but last row
+                    for ax in row:
+                        ax.set_xticklabels([])
+            if y:
+                for row in self.axes:
+                    for ax in row[1:]:  # all but first column in each row
+                        ax.set_yticklabels([])
+        else:
+            # regular: axes[row][col]
+            if x:
+                for row in self.axes[:-1]:
+                    for ax in row:
+                        ax.set_xticklabels([])
+            if y:
+                for row in self.axes:
+                    for ax in row[1:]:
+                        ax.set_yticklabels([])
 
     def mapped_function(g, artist_key, **default_kwargs):
         def f(self, *args, **kwargs):
@@ -210,18 +285,15 @@ class Figure:
 
         return f
 
-
-    supxlabel = mapped_function(mpl.figure.Figure.supxlabel, "supxlabel",fontsize="axis_label_fontsize")
-    supylabel = mapped_function(mpl.figure.Figure.supylabel, "supylabel",fontsize="axis_label_fontsize")
-
+    supxlabel = mapped_function(mpl.figure.Figure.supxlabel, "supxlabel", fontsize="axis_label_fontsize")
+    supylabel = mapped_function(mpl.figure.Figure.supylabel, "supylabel", fontsize="axis_label_fontsize")
 
     def render(self):
         """
         The workhorse.
         """
         #first render with no margins and figure out how much space we need to make
-        h_margins = [0, ]*(len(self.column_widths)+1)
-        v_margins = [0, ]*(len(self.row_heights)+1)
+        h_margins, v_margins = self._init_margins()
         with mpl.rc_context(self.rc_params):
             fig, axes = self.render_fixed_margins(h_margins, v_margins)
             fig.canvas.draw() #force draw so bboxes are valid outside Jupyter
@@ -238,54 +310,99 @@ class Figure:
 
         return fig, axes
 
-
-    def render_fixed_margins(self, h_margins, v_margins):
-
-        w = self.figure_width
-        h = self.aspect_ratio*self.figure_width
-
-        fig = plt.figure(figsize=(w, h))
-
-        real_column_widths = np.array(self.column_widths)*(1 -sum(h_margins))
-        real_row_heights = np.array(self.row_heights)*(1 -sum(v_margins))
-
-        axes = []
-        Y = 1
-
-        for m, row in enumerate(self.axes):
-            axes.append([])
-            Y = Y - v_margins[m]
-            Y = Y - real_row_heights[m]
-            X = 0
-            for n, srax in enumerate(row):
-                X = X + h_margins[n]
-                ax = fig.add_axes([X,Y ,real_column_widths[n] , real_row_heights[m]])
-                X = X + real_column_widths[n]
-
-                srax.render(ax)
-                axes[-1].append(ax)
+    def _render_artists(self, fig):
+        """Draw queued figure-level artists (supxlabel, supylabel, etc.)."""
         self.artists = {}
-        for f, artist_key, args, kwargs in zip(self.f_queue, self.artist_queue, self.args_queue, self.kwargs_queue):
+        for f, artist_key, args, kwargs in zip(
+            self.f_queue, self.artist_queue, self.args_queue, self.kwargs_queue
+        ):
             if artist_key is None:
                 f(fig, *args, **kwargs)
             else:
                 self.artists[artist_key] = f(fig, *args, **kwargs)
 
+    def render_fixed_margins(self, h_margins, v_margins):
+
+        w = self.figure_width
+        h = self.aspect_ratio * self.figure_width
+        fig = plt.figure(figsize=(w, h))
+
+        if self._layout == 'col_major':
+            # axes[col][row]; each column has its own v_margins and row_heights
+            real_column_widths = self.column_widths * (1 - sum(h_margins))
+            axes = []
+            X = 0.0
+            for n, (col, col_row_heights) in enumerate(zip(self.axes, self.row_heights)):
+                col_v_margins = v_margins[n]
+                real_row_heights = col_row_heights * (1 - sum(col_v_margins))
+                axes.append([])
+                X += h_margins[n]
+                Y = 1.0
+                for m, srax in enumerate(col):
+                    Y -= col_v_margins[m]
+                    Y -= real_row_heights[m]
+                    ax = fig.add_axes([X, Y, real_column_widths[n], real_row_heights[m]])
+                    srax.render(ax)
+                    axes[-1].append(ax)
+                X += real_column_widths[n]
+
+        elif self._layout == 'row_major':
+            # axes[row][col]; each row has its own h_margins and column_widths
+            real_row_heights = self.row_heights * (1 - sum(v_margins))
+            axes = []
+            Y = 1.0
+            for m, (row, row_col_widths) in enumerate(zip(self.axes, self.column_widths)):
+                row_h_margins = h_margins[m]
+                real_col_widths = row_col_widths * (1 - sum(row_h_margins))
+                axes.append([])
+                Y -= v_margins[m]
+                Y -= real_row_heights[m]
+                X = 0.0
+                for n, srax in enumerate(row):
+                    X += row_h_margins[n]
+                    ax = fig.add_axes([X, Y, real_col_widths[n], real_row_heights[m]])
+                    srax.render(ax)
+                    axes[-1].append(ax)
+                    X += real_col_widths[n]
+
+        else:
+            # regular: axes[row][col]
+            real_column_widths = self.column_widths * (1 - sum(h_margins))
+            real_row_heights = self.row_heights * (1 - sum(v_margins))
+            axes = []
+            Y = 1.0
+            for m, row in enumerate(self.axes):
+                axes.append([])
+                Y -= v_margins[m]
+                Y -= real_row_heights[m]
+                X = 0.0
+                for n, srax in enumerate(row):
+                    X += h_margins[n]
+                    ax = fig.add_axes([X, Y, real_column_widths[n], real_row_heights[m]])
+                    X += real_column_widths[n]
+                    srax.render(ax)
+                    axes[-1].append(ax)
+
+        self._render_artists(fig)
         return fig, axes
 
-    def bbox_pix(self, m, n, ax):
-
+    def bbox_pix(self, ax, is_bottom_row, is_left_col):
+        """
+        Return the tight bounding box of ax in pixel coordinates, extended to
+        include supxlabel / supylabel if present and this panel is on the
+        relevant edge.
+        """
         bounds = np.array(ax.get_tightbbox().bounds) #x0, y0, width, height
 
-        if "supxlabel" in self.artists and m == 1:
+        if "supxlabel" in self.artists and is_bottom_row:
             #want to extend bbox downward
             xlabel_bounds = self.artists["supxlabel"].get_window_extent().bounds
-            new_height = xlabel_bounds[1] + xlabel_bounds[3]  + bounds[3]
+            new_height = xlabel_bounds[1] + xlabel_bounds[3] + bounds[3]
             bounds[1] = bounds[1] - (xlabel_bounds[1] + xlabel_bounds[3])
             bounds[3] = new_height
 
-        if "supylabel" in self.artists and n == 0:
-            #want to extend bbox right
+        if "supylabel" in self.artists and is_left_col:
+            #want to extend bbox leftward
             ylabel_bounds = self.artists["supylabel"].get_window_extent().bounds
             new_width = ylabel_bounds[0] + ylabel_bounds[2] + bounds[2]
             bounds[0] = bounds[0] - (ylabel_bounds[0] + ylabel_bounds[2])
@@ -293,63 +410,134 @@ class Figure:
 
         return bounds
 
+    def _bbox_rel(self, ax, is_bottom_row, is_left_col, w, h, dpi):
+        """Return bbox_pix normalized to figure dimensions."""
+        bp = self.bbox_pix(ax, is_bottom_row, is_left_col)
+        bi = bp / dpi
+        return [bi[0] / w, bi[1] / h, bi[2] / w, bi[3] / h]
 
     def correct_margins(self, fig, axes, h_margins, v_margins):
 
-
         w = self.figure_width
-        h = self.aspect_ratio*self.figure_width
-        inner_x_margin = (self.inner_margin_pt/72)/w
-        inner_y_margin = (self.inner_margin_pt/72)/h
-        left_margin = (self.left_margin_pt/72)/w
-        top_margin = (self.top_margin_pt/72)/h
-        right_margin = (self.right_margin_pt/72 )/w
+        h = self.aspect_ratio * self.figure_width
+        dpi = fig.dpi
+        inner_x_margin = (self.inner_margin_pt/72) / w
+        inner_y_margin = (self.inner_margin_pt/72) / h
+        left_margin = (self.left_margin_pt/72) / w
+        top_margin = (self.top_margin_pt/72) / h
+        right_margin = (self.right_margin_pt/72) / w
 
         if self.bare_right:
             right_margin += self.rc_params['axes.linewidth'] / (2*72*w)
         if self.bare_top:
             top_margin += self.rc_params['axes.linewidth'] / (2*72*w)
 
+        if self._layout == 'col_major':
+            # ---- Vertical margins: independent per column ----
+            for n, col_axes in enumerate(axes):
+                col_v_margins = v_margins[n]
+                n_rows = len(col_axes)
+                bottom_edge = 1.0
+                min_bottom = 1.0
+                for m, ax in enumerate(col_axes):
+                    br = self._bbox_rel(ax, m == n_rows - 1, n == 0, w, h, dpi)
+                    top_edge = br[1] + br[3] - sum(col_v_margins[:m+1])
+                    y_delta = top_edge - bottom_edge + (inner_y_margin if m > 0 else top_margin)
+                    if y_delta > 0:
+                        col_v_margins[m] += y_delta
+                    if br[1] + col_v_margins[-1] < 0:
+                        col_v_margins[-1] = -br[1]
+                    min_bottom = min(min_bottom, br[1] - sum(col_v_margins[:m+1]))
+                    bottom_edge = min_bottom
 
-        max_right_edge = 0.0
-        min_bottom_edge = 1.0
-        bottom_edge = 1.0
-        for m, (row, srrow) in enumerate(zip(axes, self.axes)):
-            right_edge = 0.0
-            for n, (ax, srax) in enumerate(zip(row, srrow)):
-
-                bbox_pix = self.bbox_pix(m,n, ax)
-                bbox_inches = bbox_pix / fig.dpi
-                bbox_rel = [bbox_inches[0] / w, bbox_inches[1] / h,bbox_inches[2] / w, bbox_inches[3] / h]
-                left_edge = bbox_rel[0] + sum([h_margins[i] for i in range(n+1)])
-                top_edge= bbox_rel[1] +bbox_rel[3] - sum([v_margins[i] for i in range(m+1)])
-
-                x_delta = (right_edge - left_edge)
-                y_delta = (top_edge - bottom_edge)
-                if n > 0:
-                    x_delta += inner_x_margin
-                else:
-                    x_delta += left_margin
-                if m > 0:
-                    y_delta += inner_y_margin
-                else:
-                    y_delta += top_margin
-
+            # ---- Horizontal margins: shared across all columns ----
+            max_right_edge = 0.0
+            for n, col_axes in enumerate(axes):
+                n_rows = len(col_axes)
+                # tight bbox extent across all rows of this column
+                min_left = min(
+                    self._bbox_rel(ax, m == n_rows - 1, n == 0, w, h, dpi)[0]
+                    for m, ax in enumerate(col_axes)
+                )
+                max_right = max(
+                    sum(self._bbox_rel(ax, m == n_rows - 1, n == 0, w, h, dpi)[0:3:2])
+                    for m, ax in enumerate(col_axes)
+                )
+                left_edge = min_left + sum(h_margins[:n+1])
+                x_delta = max_right_edge - left_edge + (inner_x_margin if n > 0 else left_margin)
                 if x_delta > 0:
                     h_margins[n] += x_delta
+                max_right_edge = max(max_right + sum(h_margins[:n+1]), max_right_edge)
+                if max_right > 1 - right_margin + h_margins[-1]:
+                    h_margins[-1] = max_right + right_margin - 1
+
+        elif self._layout == 'row_major':
+            # ---- Horizontal margins: independent per row ----
+            n_rows = len(axes)
+            for m, row_axes in enumerate(axes):
+                row_h_margins = h_margins[m]
+                right_edge = 0.0
+                for n, ax in enumerate(row_axes):
+                    br = self._bbox_rel(ax, m == n_rows - 1, n == 0, w, h, dpi)
+                    left_edge = br[0] + sum(row_h_margins[:n+1])
+                    x_delta = right_edge - left_edge + (inner_x_margin if n > 0 else left_margin)
+                    if x_delta > 0:
+                        row_h_margins[n] += x_delta
+                    if br[0] + br[2] > 1 - right_margin + row_h_margins[-1]:
+                        row_h_margins[-1] = br[0] + br[2] + right_margin - 1
+                    right_edge = max(right_edge, br[0] + br[2] + sum(row_h_margins[:n+1]))
+
+            # ---- Vertical margins: shared across all rows ----
+            bottom_edge = 1.0
+            min_bottom = 1.0
+            for m, row_axes in enumerate(axes):
+                n_rows_total = len(axes)
+                # tight bbox extent across all cols of this row
+                max_top = max(
+                    sum(self._bbox_rel(ax, m == n_rows_total - 1, n == 0, w, h, dpi)[1:4:2])
+                    for n, ax in enumerate(row_axes)
+                )
+                min_bot = min(
+                    self._bbox_rel(ax, m == n_rows_total - 1, n == 0, w, h, dpi)[1]
+                    for n, ax in enumerate(row_axes)
+                )
+                top_edge = max_top - sum(v_margins[:m+1])
+                y_delta = top_edge - bottom_edge + (inner_y_margin if m > 0 else top_margin)
                 if y_delta > 0:
                     v_margins[m] += y_delta
-                right_edge = bbox_rel[0] + bbox_rel[2] + sum([h_margins[i] for i in range(n+1)])
-                max_right_edge = max(right_edge, max_right_edge)
-                min_bottom_edge = min(min_bottom_edge, bbox_rel[1] - sum([v_margins[i] for i in range(m+1)]))
+                if min_bot + v_margins[-1] < 0:
+                    v_margins[-1] = -min_bot
+                min_bottom = min(min_bottom, min_bot - sum(v_margins[:m+1]))
+                bottom_edge = min_bottom
 
-                if bbox_rel[0] + bbox_rel[2] > 1 - right_margin + h_margins[-1]:
-                    h_margins[-1] = bbox_rel[0] + bbox_rel[2] + right_margin - 1
-                if bbox_rel[1]  + v_margins[-1] <  0 :
-                    v_margins[-1] = -bbox_rel[1]
-            bottom_edge = min_bottom_edge
+        else:
+            # regular
+            n_rows = len(axes)
+            max_right_edge = 0.0
+            min_bottom_edge = 1.0
+            bottom_edge = 1.0
+            for m, row in enumerate(axes):
+                right_edge = 0.0
+                for n, ax in enumerate(row):
+                    br = self._bbox_rel(ax, m == n_rows - 1, n == 0, w, h, dpi)
+                    left_edge = br[0] + sum(h_margins[:n+1])
+                    top_edge = br[1] + br[3] - sum(v_margins[:m+1])
+
+                    x_delta = right_edge - left_edge + (inner_x_margin if n > 0 else left_margin)
+                    y_delta = top_edge - bottom_edge + (inner_y_margin if m > 0 else top_margin)
+
+                    if x_delta > 0:
+                        h_margins[n] += x_delta
+                    if y_delta > 0:
+                        v_margins[m] += y_delta
+                    right_edge = br[0] + br[2] + sum(h_margins[:n+1])
+                    max_right_edge = max(right_edge, max_right_edge)
+                    min_bottom_edge = min(min_bottom_edge, br[1] - sum(v_margins[:m+1]))
+
+                    if br[0] + br[2] > 1 - right_margin + h_margins[-1]:
+                        h_margins[-1] = br[0] + br[2] + right_margin - 1
+                    if br[1] + v_margins[-1] < 0:
+                        v_margins[-1] = -br[1]
+                bottom_edge = min_bottom_edge
 
         return h_margins, v_margins
-
-
-
