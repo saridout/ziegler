@@ -18,12 +18,14 @@ widths = {"PR": 3+3/8,
           "PNAS_mid": 4.5,
           "PNAS_full": 7.0,
           "poster": 10,
-          "powerpoint": 11.5
+          "powerpoint": 11.5,
+          "PLOS": 6.5
           }
 
 colors = {"cadmium_red": "#D22B2B",
           "cobalt_blue": "#0047AB",
-          "sean_green": "#1E8449"
+          "sean_green": "#1E8449",
+          "byzantium":  "#702963",
           }
 
 class Axes:
@@ -142,6 +144,7 @@ class Figure:
                  column_widths=[1.0,], row_heights=[1.0,],
                  inner_margin_pt=_UNSET, inner_hmargin_pt=None, inner_vmargin_pt=None,
                  top_margin_pt=0, left_margin_pt=0, right_margin_pt=0,
+                 bottom_margin_pt=0,
                  ax_line_scale=1, line_scale=1, bare_top=True, bare_right=True,
                  tick_label_fontsize=None,
                  rc_params=None):
@@ -214,6 +217,7 @@ class Figure:
         self.top_margin_pt = top_margin_pt
         self.left_margin_pt = left_margin_pt
         self.right_margin_pt = right_margin_pt
+        self.bottom_margin_pt = bottom_margin_pt
         self.axis_label_fontsize = axis_label_fontsize
         self.tick_label_fontsize = tick_label_fontsize
 
@@ -412,6 +416,21 @@ class Figure:
         """
         bounds = np.array(ax.get_tightbbox().bounds) #x0, y0, width, height
 
+        # get_tightbbox() clips its return value to the figure canvas boundary.
+        # Axis labels can extend outside that boundary (e.g. a long y-axis label
+        # at a large font size overflows above the top edge), making the overflow
+        # invisible to correct_margins.  Union with each label's true window
+        # extent, which is never clipped to the canvas.
+        renderer = ax.figure.canvas.get_renderer()
+        for label in [ax.xaxis.get_label(), ax.yaxis.get_label()]:
+            if label.get_text():
+                lb = np.array(label.get_window_extent(renderer).bounds)
+                x0 = min(bounds[0], lb[0])
+                y0 = min(bounds[1], lb[1])
+                x1 = max(bounds[0] + bounds[2], lb[0] + lb[2])
+                y1 = max(bounds[1] + bounds[3], lb[1] + lb[3])
+                bounds = np.array([x0, y0, x1 - x0, y1 - y0])
+
         if "supxlabel" in self.artists and is_bottom_row:
             #want to extend bbox downward
             xlabel_bounds = self.artists["supxlabel"].get_window_extent().bounds
@@ -444,6 +463,7 @@ class Figure:
         left_margin = (self.left_margin_pt/72) / w
         top_margin = (self.top_margin_pt/72) / h
         right_margin = (self.right_margin_pt/72) / w
+        bottom_margin = (self.bottom_margin_pt/72) / h
 
         if self.bare_right:
             right_margin += self.rc_params['axes.linewidth'] / (2*72*w)
@@ -463,8 +483,8 @@ class Figure:
                     y_delta = top_edge - bottom_edge + (inner_y_margin if m > 0 else top_margin)
                     if y_delta > 0:
                         col_v_margins[m] += y_delta
-                    if br[1] + col_v_margins[-1] < 0:
-                        col_v_margins[-1] = -br[1]
+                    if br[1] + col_v_margins[-1] < bottom_margin:
+                        col_v_margins[-1] = bottom_margin - br[1]
                     min_bottom = min(min_bottom, br[1] - sum(col_v_margins[:m+1]))
                     bottom_edge = min_bottom
 
@@ -565,8 +585,8 @@ class Figure:
                 y_delta = top_edge - bottom_edge + (inner_y_margin if m > 0 else top_margin)
                 if y_delta > 0:
                     v_margins[m] += y_delta
-                if min_bot + v_margins[-1] < 0:
-                    v_margins[-1] = -min_bot
+                if min_bot + v_margins[-1] < bottom_margin:
+                    v_margins[-1] = bottom_margin - min_bot
                 min_bottom = min(min_bottom, min_bot - sum(v_margins[:m+1]))
                 bottom_edge = min_bottom
 
@@ -596,8 +616,8 @@ class Figure:
 
                     if br[0] + br[2] > 1 - right_margin + h_margins[-1]:
                         h_margins[-1] = br[0] + br[2] + right_margin - 1
-                    if br[1] + v_margins[-1] < 0:
-                        v_margins[-1] = -br[1]
+                    if br[1] + v_margins[-1] < bottom_margin:
+                        v_margins[-1] = bottom_margin - br[1]
                 bottom_edge = min_bottom_edge
 
         return h_margins, v_margins
